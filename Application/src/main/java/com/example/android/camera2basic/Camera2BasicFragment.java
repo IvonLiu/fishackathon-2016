@@ -835,7 +835,9 @@ public class Camera2BasicFragment extends Fragment
                 public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                                @NonNull CaptureRequest request,
                                                @NonNull TotalCaptureResult result) {
-                    showToast("Saved: " + mFile);
+                    double di = result.get(CaptureResult.LENS_FOCUS_DISTANCE);
+                    double length = CameraUtils.getObjectLength(di);
+                    showToast("Saved: " + mFile + "\nLength: " + length);
                     Log.d(TAG, mFile.toString());
                     unlockFocus();
                 }
