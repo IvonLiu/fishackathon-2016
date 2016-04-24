@@ -2,6 +2,7 @@ package com.example.android.camera2basic;
 
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.support.v7.widget.CardView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -75,7 +76,10 @@ public class PhotoAdapter extends ArrayAdapter<Photo> {
         mapButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // do something
+                Uri gmmIntentUri = Uri.parse("geo:0,0?q="+photo.latitude+","+photo.longitude);
+                Intent mapIntent = new Intent(Intent.ACTION_VIEW, gmmIntentUri);
+                mapIntent.setPackage("com.google.android.apps.maps");
+                getContext().startActivity(mapIntent);
             }
         });
 

@@ -74,6 +74,7 @@ public class CreatePostFragment extends Fragment
     }
 
     private void save() {
+        Toast.makeText(getActivity(), "Submitting...", Toast.LENGTH_SHORT).show();
         new FilestackTask(this).execute(mImage);
     }
 
@@ -82,7 +83,6 @@ public class CreatePostFragment extends Fragment
         String type = mTypeField.getText().toString();
         Photo photo = new Photo(url, mLength, mLatitude, mLongitude, type, System.currentTimeMillis());
         mFirebaseRef.push().setValue(photo.format());
-        Toast.makeText(getActivity(), "Submitting...", Toast.LENGTH_SHORT).show();
         getActivity().finish();
     }
 
