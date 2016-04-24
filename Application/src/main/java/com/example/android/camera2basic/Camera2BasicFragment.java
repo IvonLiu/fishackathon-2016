@@ -24,6 +24,7 @@ import android.app.DialogFragment;
 import android.app.Fragment;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.ImageFormat;
@@ -41,6 +42,10 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.location.LocationProvider;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Bundle;
@@ -72,7 +77,11 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 public class Camera2BasicFragment extends Fragment
-        implements View.OnClickListener, FragmentCompat.OnRequestPermissionsResultCallback {
+        implements View.OnClickListener, FragmentCompat.OnRequestPermissionsResultCallback, LocationListener {
+
+    private static final long LOCATION_AGE_THRESHOLD = 10*60*1000;    // 10 seconds
+    private Location mLocation;
+    private LocationManager mLocationManager;
 
     /**
      * Conversion from screen rotation to JPEG orientation.
@@ -435,6 +444,8 @@ public class Camera2BasicFragment extends Fragment
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
         mFile = new File(getActivity().getExternalFilesDir(null), "pic.jpg");
+        mLocationManager = (LocationManager) getActivity().getSystemService(Context.LOCATION_SERVICE);
+        tryUpdateLocation();
     }
 
     @Override
@@ -461,23 +472,24 @@ public class Camera2BasicFragment extends Fragment
     }
 
     private void requestCameraPermission() {
-        if (FragmentCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)) {
-            new ConfirmationDialog().show(getChildFragmentManager(), FRAGMENT_DIALOG);
-        } else {
-            FragmentCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA},
-                    REQUEST_CAMERA_PERMISSION);
-        }
+        FragmentCompat.requestPermissions(this, new String[]{
+                        Manifest.permission.CAMERA,
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                },
+                REQUEST_CAMERA_PERMISSION);
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
-            if (grantResults.length != 1 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
+            if (grantResults.length != 2 || grantResults[0] != PackageManager.PERMISSION_GRANTED
+                    || grantResults[1] != PackageManager.PERMISSION_GRANTED) {
                 ErrorDialog.newInstance(getString(R.string.request_permission))
                         .show(getChildFragmentManager(), FRAGMENT_DIALOG);
             }
         } else {
+            tryUpdateLocation();
             super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         }
     }
@@ -837,9 +849,37 @@ public class Camera2BasicFragment extends Fragment
                                                @NonNull TotalCaptureResult result) {
                     double di = result.get(CaptureResult.LENS_FOCUS_DISTANCE);
                     double length = CameraUtils.getObjectLength(di);
-                    showToast("Saved: " + mFile + "\nLength: " + length);
+                    /*String latLong = "NULL!!";
+                    if (mLocation != null) {
+                        latLong = mLocation.getLatitude() + ", " + mLocation.getLongitude();
+                    }*/
+                    double latitude = 0;
+                    double longitude = 0;
+                    if (mLocation != null) {
+                        latitude = mLocation.getLatitude();
+                        longitude = mLocation.getLongitude();
+                    }
+                    //showToast("Saved: " + mFile + "\nLength: " + length + "\nLocation: " + latLong);
                     Log.d(TAG, mFile.toString());
                     unlockFocus();
+
+                    if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.ACCESS_FINE_LOCATION)
+                            != PackageManager.PERMISSION_GRANTED) {
+                        // THIS SHOULD NEVER HAPPEN!!
+                        requestCameraPermission();
+                        return;
+                    }
+                    mLocationManager.removeUpdates(Camera2BasicFragment.this);
+
+                    // Send intent to save stuff
+                    Intent intent = new Intent(getActivity(), GenericActivity.class);
+                    intent.putExtra(GenericActivity.EXTRA_TYPE, GenericActivity.TYPE_CREATE);
+                    intent.putExtra(CreatePostFragment.EXTRA_IMAGE, mFile);
+                    intent.putExtra(CreatePostFragment.EXTRA_LENGTH, length);
+                    intent.putExtra(CreatePostFragment.EXTRA_LATITUDE, latitude);
+                    intent.putExtra(CreatePostFragment.EXTRA_LONGITUDE, longitude);
+                    startActivity(intent);
+
                 }
             };
 
@@ -893,13 +933,9 @@ public class Camera2BasicFragment extends Fragment
                 break;
             }
             case R.id.info: {
-                Activity activity = getActivity();
-                if (null != activity) {
-                    new AlertDialog.Builder(activity)
-                            .setMessage(R.string.intro_message)
-                            .setPositiveButton(android.R.string.ok, null)
-                            .show();
-                }
+                Intent intent = new Intent(getActivity(), GenericActivity.class);
+                intent.putExtra(GenericActivity.EXTRA_TYPE, GenericActivity.TYPE_PAST);
+                startActivity(intent);
                 break;
             }
         }
@@ -1031,6 +1067,62 @@ public class Camera2BasicFragment extends Fragment
                             })
                     .create();
         }
+    }
+
+    /* Location stuff */
+
+    private void tryUpdateLocation() {
+
+        if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestCameraPermission();
+            return;
+        }
+
+        LocationProvider networkProvider = mLocationManager.getProvider(LocationManager.NETWORK_PROVIDER);
+        LocationProvider gpsProvider = mLocationManager.getProvider(LocationManager.GPS_PROVIDER);
+
+        String provider = "";
+        if (networkProvider != null) {
+            provider = LocationManager.NETWORK_PROVIDER;
+        } else if (gpsProvider != null) {
+            provider = LocationManager.GPS_PROVIDER;
+        }
+
+        Location tryNewLocation = mLocationManager.getLastKnownLocation(provider);
+        if ((tryNewLocation != null && ageInMilliseconds(tryNewLocation) < LOCATION_AGE_THRESHOLD)) {
+            mLocation = tryNewLocation;
+        } else {
+            if (networkProvider != null || gpsProvider != null) {
+                mLocationManager.requestLocationUpdates(provider, 0, 0, this);
+            }
+        }
+    }
+
+    private long ageInMilliseconds(Location location) {
+        return System.currentTimeMillis() - location.getTime();
+    }
+
+    @Override
+    public void onLocationChanged(Location newLocation) {
+        if (mLocation == null || newLocation.getTime() >= mLocation.getTime()) {
+            mLocation = newLocation;
+        }
+    }
+
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+
+    }
+
+    @Override
+    public void onProviderEnabled(String provider) {
+
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
+
     }
 
 }
