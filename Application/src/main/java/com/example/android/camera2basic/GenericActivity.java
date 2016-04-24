@@ -65,7 +65,7 @@ public class GenericActivity extends AppCompatActivity {
                 getSupportFragmentManager().beginTransaction()
                         .replace(R.id.fragment, CreatePostFragment.newInstance(image, length, latitude, longitude))
                         .commit();
-                getSupportActionBar().setTitle(getResources().getString(R.string.app_name));
+                getSupportActionBar().setTitle("New Catch");
                 getFab().setVisibility(View.VISIBLE);
                 break;
             case TYPE_PAST:
