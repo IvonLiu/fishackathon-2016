@@ -1,6 +1,7 @@
 package com.example.android.camera2basic;
 
 import android.content.Context;
+import android.content.Intent;
 import android.support.v7.widget.CardView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -32,7 +33,7 @@ public class PhotoAdapter extends ArrayAdapter<Photo> {
     @Override
     public View getView(final int position, View convertView, ViewGroup parent) {
 
-        Photo photo = mList.get(position);
+        final Photo photo = mList.get(position);
 
         View view = convertView;
         if (view == null) {
@@ -68,7 +69,7 @@ public class PhotoAdapter extends ArrayAdapter<Photo> {
                 .centerCrop()
                 .into(photoImage);
 
-        lengthText.setText(photo.length + "cm");
+        lengthText.setText(String.format("%.2f cm", photo.length));
         dateText.setText(format(photo.timestamp));
 
         mapButton.setOnClickListener(new View.OnClickListener() {
@@ -81,7 +82,12 @@ public class PhotoAdapter extends ArrayAdapter<Photo> {
         shareButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // do something
+                String text = String.format("Look at the %.2f cm fish I just caught! %s", photo.length, photo.url);
+                Intent sendIntent = new Intent();
+                sendIntent.setAction(Intent.ACTION_SEND);
+                sendIntent.putExtra(Intent.EXTRA_TEXT, text);
+                sendIntent.setType("text/plain");
+                getContext().startActivity(sendIntent);
             }
         });
 

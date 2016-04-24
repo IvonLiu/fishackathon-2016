@@ -11,6 +11,7 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.firebase.client.Firebase;
 
@@ -62,8 +63,8 @@ public class CreatePostFragment extends Fragment
 
         Bitmap bitmap = BitmapFactory.decodeFile(mImage.getAbsolutePath());
         mImageView.setImageBitmap(bitmap);
-        mLengthText.setText(mLength + " cm");
-        mLocationText.setText(mLatitude + ", " + mLongitude);
+        mLengthText.setText(String.format("%.2f cm", mLength));
+        mLocationText.setText(String.format("%.3f, %.3f", mLatitude, mLongitude));
 
         ((GenericActivity) getActivity()).setFabClickListener(this);
 
@@ -81,6 +82,7 @@ public class CreatePostFragment extends Fragment
         String type = mTypeField.getText().toString();
         Photo photo = new Photo(url, mLength, mLatitude, mLongitude, type, System.currentTimeMillis());
         mFirebaseRef.push().setValue(photo.format());
+        Toast.makeText(getActivity(), "Submitting...", Toast.LENGTH_SHORT).show();
         getActivity().finish();
     }
 
